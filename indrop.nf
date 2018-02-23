@@ -20,7 +20,6 @@ if (params.help) exit 1
 
 genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
-barcodeFile        	= file(params.barcode) 
 configFile        	= file(params.config) 
 
 outputMapping   = "Alignments";
@@ -30,8 +29,10 @@ filt_folder		= "Filtered_reads";
 if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
 if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFile}"
 
-if (params.strand == "yes") qualiOption = "strand-specific-forward"
-else if (params.strand != "no") qualiOption = "non-strand-specific"
+/*
+* if (params.strand == "yes") qualiOption = "strand-specific-forward"
+* else if (params.strand != "no") qualiOption = "non-strand-specific"
+*/
 
 /*
  * Creates the `read_pairs` channel that emits for each read-pair a tuple containing
@@ -46,6 +47,9 @@ Channel
  * Step 1. Launch droptag for tagging your files
  */
 process dropTag {    
+
+	tag { pair_id }
+
     input:
     set pair_id, file(reads) from read_pairs
     file configFile
@@ -62,7 +66,7 @@ process dropTag {
 
 /*
  * Step 2 extract read length
- */
+
 process getReadLength {   
     input: 
     set pair_id, file(single_whole_filtered) from whole_filtered_files_for_size.first()
@@ -77,9 +81,9 @@ process getReadLength {
 } 
 
 
- /*
+ 
  * Step 3. Builds the genome index required by the mapping process
- */
+ 
  
     
 process buildIndex {
@@ -96,7 +100,7 @@ process buildIndex {
     """
 }
 
-/*
+
 process mapping {
 	publishDir outputMapping
 
