@@ -9,10 +9,12 @@
 
 log.info "BIOCORE@CRG RNASeq - N F  ~  version 0.1"
 log.info "========================================"
-log.info "pairs                  : ${params.pairs}"
-log.info "genome                 : ${params.genome}"
-log.info "annotation             : ${params.annotation}"
-log.info "config                 : ${params.config}"
+log.info "pairs               		 : ${params.pairs}"
+log.info "genome               		 : ${params.genome}"
+log.info "annotation           	     : ${params.annotation}"
+log.info "config             	     : ${params.config}"
+log.info "barcode_list               : ${params.barcode_list}"
+log.info "output (output folder) 	 : ${params.output}"
 log.info "\n"
 
 if (params.help) exit 1
@@ -21,11 +23,16 @@ if (params.help) exit 1
 genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
 configFile        	= file(params.config) 
+barcodeFile        	= file(params.barcode_list) 
 
-outputMapping   = "Alignments";
-stat_folder		= "Statistics";
-filt_folder		= "Filtered_reads";
+outputfolder    = "${params.output}"
+outputQC		= "${outputfolder}/QC"
+outputMapping   = "${outputfolder}/Alignments";
+filt_folder		= "${outputfolder}/Tagged_reads";
+est_folder		= "${outputfolder}/Estimated_counts";
 
+
+if( !barcodeFile.exists() ) exit 1, "Missing barcode file: ${barcodeFile}"
 if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
 if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFile}"
 
@@ -41,12 +48,36 @@ if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFil
 Channel
     .fromFilePairs( params.pairs )                                             
     .ifEmpty { error "Cannot find any reads matching: ${params.pairs}" }  
-    .set { read_pairs }
+    .into { read_pairs; reads_for_fastqc }
+
+
+/*
+ * Step 0. Run FastQC on raw data
+*/
+process QConRawReads {
+	publishDir outputQC
+
+	tag { read }
+
+    input:
+    set pair_id, file(read) from reads_for_fastqc
+
+     output:
+   	 file("*_fastqc.*") into raw_fastqc_files
+
+     script:
+
+    """
+		fastqc ${read} 
+    """
+}
+
     
 /*
  * Step 1. Launch droptag for tagging your files
  */
 process dropTag {    
+	publishDir filt_folder
 
 	tag { pair_id }
 
@@ -55,36 +86,61 @@ process dropTag {
     file configFile
     
     output:
-    set pair_id, "*.tagged.*.fastq.gz" into tagged_files
+    set pair_id, "*.tagged.*.fastq.gz" into tagged_files_for_alignment
+    set pair_id, "*.tagged.*.fastq.gz" into tagged_files_for_fastqc
+    file "*.tagged.*.fastq.gz" into tagged_files_for_size_est
   
     """
 		droptag -S -p ${task.cpus} -c ${configFile} ${reads} 
     """
 }   
 
+/*
+ * Step 2. FastQC of your trimmed files
+ */
 
+process QCFiltReads {
+	publishDir outputQC
+
+	tag { filtered_read }
+
+   	 input:
+     set pair_id, file(filtered_read) from tagged_files_for_fastqc
+
+     output:
+   	 file("*_fastqc.*") into trimmed_fastqc_files
+
+     script:
+
+    """
+		fastqc ${filtered_read} 
+    """
+   }
 
 /*
- * Step 2 extract read length
+ * Step 3 extract read length of filtered reads?
+*/
 
 process getReadLength {   
+	tag { tagged_files_for_size_est }
+
     input: 
-    set pair_id, file(single_whole_filtered) from whole_filtered_files_for_size.first()
+    file(tagged_files_for_size_est) from tagged_files_for_size_est.flatten().first()
  
 	output: 
 	stdout into read_length
 
 
     """
-    estim_read_size.sh ${single_whole_filtered}
+    estim_read_size.sh ${tagged_files_for_size_est}
     """
 } 
 
 
- 
- * Step 3. Builds the genome index required by the mapping process
- 
- 
+ /*
+ * Step 4. Builds the genome index required by the mapping process
+ */
+
     
 process buildIndex {
     input:
@@ -100,29 +156,67 @@ process buildIndex {
     """
 }
 
+ /*
+ * Step 5. Mapping with STAR
+ */
 
 process mapping {
 	publishDir outputMapping
+	tag { pair_id }
 
 	input:
 	file STARgenome from STARgenomeIndex
-	set pair_id, file(reads) from whole_filtered_files_for_mapping
+	set pair_id, file(reads) from tagged_files_for_alignment	
 
 	output:
-	set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_parsing
+	set pair_id, file("STAR_${pair_id}/${pair_id}Aligned.sortedByCoord.out.bam") into STARmappedTags_for_est
 	set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_qualimap
-        set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_multiQC
+    set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_multiQC
 
 	script:		
-	mappingPairs( pair_id, STARgenome, reads, task.cpus)  
+	mappingPairs( pair_id, STARgenome, reads.join(","), task.cpus)  
 }
 
 
+process dropEst {
+	publishDir est_folder
+	tag { pair_id }
 
+	input:
+	set pair_id, file(tags) from STARmappedTags_for_est
+	file ("barcode_file.txt") from barcodeFile
+	file annotationFile
+    file configFile
 
+	output:
+	set pair_id, file ("*.rds")  into estimates
 
+	script:		
+    """
+	dropest -m -w -g ${annotationFile} -c ${configFile} -o ${pair_id}.est ${tags} 
+    """
+	
 
- * Step 7. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
+}
+
+process dropReport {
+	publishDir est_folder
+	tag { pair_id }
+
+	input:
+	set pair_id, file(estimate) from estimates
+
+	output:
+	set pair_id, file ("*")  into out
+
+	script:		
+    """
+    /home/user/dropEst/dropReport.Rsc ${estimate}
+    """
+}
+
+/*
+ * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
 
 process qualimap {
     publishDir stat_folder, mode: 'copy'
@@ -146,25 +240,34 @@ process qualimap {
 }
 
 
+ * Step 7. Multi QC.
 
-process multiQC {
-    publishDir stat_folder, mode: 'copy'
+	process multiQC_unfiltered {
+	    publishDir outputQC
 
-    input:
-    file 'STAR_*' from STARmappedFolders_for_multiQC.collect()
-    file 'QUALIMAP_*' from QualiMap.collect()
+	    input:
+        file multiconfig
+	    file ribo_report
+	    file '*' from raw_fastqc_files.collect()
+	    file '*' from trimmed_fastqc_files.collect()	    
+	    file '*' from STARmappedFolders_for_multiQC.collect()
+	    file '*' from logTrimming_for_QC.collect()
+	    file '*' from QualiMap.collect()
 
-    output:
-    file("multiqc_report.html") into multiQC
+	    output:
+ 	   file("multiqc_report.html") into multiQC 
+	
+	    script:
+		 //
+   		 // multiqc
+   		 //
+ 	    """
+ 	    check_tool_version.pl -l fastqc,star,skewer,qualimap,ribopicker,bedtools,samtools > tools_mqc.txt
+	    multiqc -c ${multiconfig} .
+	    """
 
-    script:
-    //
-    // multiqc
-    //
-    """
-    multiqc .
-    """
 }
+
 */
 
 
@@ -181,8 +284,8 @@ def mappingPairs( pair_id, STARgenome, reads, cpus) {
 				 --outSAMtype BAM SortedByCoordinate \
 				 --runThreadN ${cpus} \
 				 --quantMode GeneCounts \
-				 --outFileNamePrefix ${pair_id}
-							 	
+				 --outFileNamePrefix ${pair_id} \
+				 --readFilesCommand zcat			 	
 
 			mkdir STAR_${pair_id}
 			mv ${pair_id}Aligned* STAR_${pair_id}/.
