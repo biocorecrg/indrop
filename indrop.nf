@@ -15,6 +15,7 @@ log.info "annotation           	     : ${params.annotation}"
 log.info "config             	     : ${params.config}"
 log.info "barcode_list               : ${params.barcode_list}"
 log.info "output (output folder) 	 : ${params.output}"
+log.info "email for notification 	 : ${params.email}"
 log.info "\n"
 
 if (params.help) exit 1
@@ -86,12 +87,15 @@ process dropTag {
     file configFile
     
     output:
-    set pair_id, "*.tagged.*.fastq.gz" into tagged_files_for_alignment
-    set pair_id, "*.tagged.*.fastq.gz" into tagged_files_for_fastqc
-    file "*.tagged.*.fastq.gz" into tagged_files_for_size_est
+    set pair_id, "${pair_id}.tagged.fastq" into tagged_files_for_alignment
+    set pair_id, "${pair_id}.tagged.fastq" into tagged_files_for_fastqc
+    file "${pair_id}.tagged.fastq" into tagged_files_for_size_est
   
     """
-		droptag -S -p ${task.cpus} -c ${configFile} ${reads} 
+		droptag -S -p ${task.cpus} -c ${configFile} ${reads}
+        zcat *_fastqc.*.gz >> ${pair_id}.tagged.fastq
+        gzip ${pair_id}.tagged.fastq
+        rm 	*_fastqc.*.gz	
     """
 }   
 
@@ -102,7 +106,7 @@ process dropTag {
 process QCFiltReads {
 	publishDir outputQC
 
-	tag { filtered_read }
+	tag { pair_id }
 
    	 input:
      set pair_id, file(filtered_read) from tagged_files_for_fastqc
@@ -113,7 +117,7 @@ process QCFiltReads {
      script:
 
     """
-		fastqc ${filtered_read} 
+		fastqc ${filtered_read}
     """
    }
 
@@ -125,7 +129,7 @@ process getReadLength {
 	tag { tagged_files_for_size_est }
 
     input: 
-    file(tagged_files_for_size_est) from tagged_files_for_size_est.flatten().first()
+    file(tagged_files_for_size_est) from tagged_files_for_size_est.first()
  
 	output: 
 	stdout into read_length
@@ -174,7 +178,7 @@ process mapping {
     set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_multiQC
 
 	script:		
-	mappingPairs( pair_id, STARgenome, reads.join(","), task.cpus)  
+	mappingPairs( pair_id, STARgenome, reads, task.cpus)  
 }
 
 
@@ -189,7 +193,9 @@ process dropEst {
     file configFile
 
 	output:
-	set pair_id, file ("*.rds")  into estimates
+	set pair_id, file ("*.rds")  into estimates_rds
+	set pair_id, file ("*.tsv")  into estimates_tsv
+	set pair_id, file ("*.mtx")  into estimates_mtx
 
 	script:		
     """
@@ -199,6 +205,8 @@ process dropEst {
 
 }
 
+/*
+*
 process dropReport {
 	publishDir est_folder
 	tag { pair_id }
@@ -211,9 +219,10 @@ process dropReport {
 
 	script:		
     """
-    /home/user/dropEst/dropReport.Rsc ${estimate}
+    dropReport.Rsc ${estimate}
     """
 }
+*/
 
 /*
  * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
@@ -270,7 +279,28 @@ process qualimap {
 
 */
 
+/*
+ * Mail notification
 
+ 
+workflow.onComplete {
+    def subject = 'indrop execution'
+    def recipient = "${params.email}"
+    def attachment = "${outputQC}/multiqc_report.html"
+
+    ['mail', '-s', subject, '-a', attachment, recipient].execute() << """
+
+    Pipeline execution summary
+    ---------------------------
+    Completed at: ${workflow.complete}
+    Duration    : ${workflow.duration}
+    Success     : ${workflow.success}
+    workDir     : ${workflow.workDir}
+    exit status : ${workflow.exitStatus}
+    Error report: ${workflow.errorReport ?: '-'}
+    """
+}
+ */
 
 /*
 * ************** CUSTOM FUNCTIONS ****************
