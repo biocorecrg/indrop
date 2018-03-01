@@ -61,7 +61,7 @@ This parameter is useful to receive a mail once the process is finished / crashe
 
 ## The pipeline
 1. QC: Run FastQC on raw reads.
-1. 1. dropTag: It uses dropTag tool to tag the sequences looking at barcodes, junction sequence and polyA tail. Joining the output fastq files in a single one.
+1. dropTag: It uses dropTag tool to tag the sequences looking at barcodes, junction sequence and polyA tail. Joining the output fastq files in a single one.
 1. Indexing: It makes the index using the estimated read length, the annotation file and the genome sequence. It stores the results within **Index** folder.
 1. QC of filtered reads: it performs a round of fastQC runs on tagged reads.
 1. Alignment: It aligns either tagged reads to the reference transcriptome (i.e. to the genome but considering also the splicing sites) and it stores the results within the **Alignments** folder. 
