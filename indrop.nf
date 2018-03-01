@@ -19,6 +19,7 @@ log.info "email for notification 	 : ${params.email}"
 log.info "\n"
 
 if (params.help) exit 1
+if (params.resume) exit 1, "Are you making the classical --resume typo? Be careful!!!! ;)"
 
 
 genomeFile          = file(params.genome)
@@ -31,6 +32,7 @@ outputQC		= "${outputfolder}/QC"
 outputMapping   = "${outputfolder}/Alignments";
 filt_folder		= "${outputfolder}/Tagged_reads";
 est_folder		= "${outputfolder}/Estimated_counts";
+plots_folder	= "${outputfolder}/Plots";
 
 
 if( !barcodeFile.exists() ) exit 1, "Missing barcode file: ${barcodeFile}"
@@ -49,7 +51,7 @@ if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFil
 Channel
     .fromFilePairs( params.pairs )                                             
     .ifEmpty { error "Cannot find any reads matching: ${params.pairs}" }  
-    .into { read_pairs; reads_for_fastqc }
+    .into { read_pairs; reads_for_fastqc; fastq_files_for_size_est }
 
 
 /*
@@ -87,17 +89,17 @@ process dropTag {
     file configFile
     
     output:
-    set pair_id, "${pair_id}.tagged.fastq" into tagged_files_for_alignment
-    set pair_id, "${pair_id}.tagged.fastq" into tagged_files_for_fastqc
-    file "${pair_id}.tagged.fastq" into tagged_files_for_size_est
+    set pair_id, "${pair_id}_tagged.fastq.gz" into tagged_files_for_alignment
+    set pair_id, "${pair_id}_tagged.fastq.gz" into tagged_files_for_fastqc
   
     """
 		droptag -S -p ${task.cpus} -c ${configFile} ${reads}
-        zcat *_fastqc.*.gz >> ${pair_id}.tagged.fastq
-        gzip ${pair_id}.tagged.fastq
-        rm 	*_fastqc.*.gz	
+        zcat *.tagged.*.gz >> ${pair_id}_tagged.fastq
+        gzip ${pair_id}_tagged.fastq
+        rm 	*.fastq.gz.tagged.*.gz
     """
 }   
+
 
 /*
  * Step 2. FastQC of your trimmed files
@@ -126,17 +128,18 @@ process QCFiltReads {
 */
 
 process getReadLength {   
-	tag { tagged_files_for_size_est }
+	tag { fastq_files_for_size_est[1] }
 
     input: 
-    file(tagged_files_for_size_est) from tagged_files_for_size_est.first()
+     set pair_id, file(fastq_files_for_size_est) from fastq_files_for_size_est.first()
+
  
 	output: 
 	stdout into read_length
 
 
     """
-    estim_read_size.sh ${tagged_files_for_size_est}
+    estim_read_size.sh ${fastq_files_for_size_est[1]}
     """
 } 
 
@@ -147,15 +150,20 @@ process getReadLength {
 
     
 process buildIndex {
+	tag { genomeFile }
+
     input:
     file genomeFile
     file annotationFile
-     val read_size from read_length.map {  it.trim().toInteger() } 
+    val read_size from read_length.map {  it.trim().toInteger() } 
 
     output:
     file "STARgenome" into STARgenomeIndex
+
+    echo true
     
     """
+    echo read size is ${read_size}
 	index_star.sh ${genomeFile} STARgenome STARgenome ${annotationFile} ${read_size-1} ${task.cpus}
     """
 }
@@ -195,6 +203,7 @@ process dropEst {
 	output:
 	set pair_id, file ("*.rds")  into estimates_rds
 	set pair_id, file ("*.tsv")  into estimates_tsv
+	set pair_id, file ("*.mtx")  into estimates_mtx_for_plots
 	set pair_id, file ("*.mtx")  into estimates_mtx
 
 	script:		
@@ -207,22 +216,46 @@ process dropEst {
 
 /*
 *
+process histCell {
+	publishDir plots_folder
+	tag { pair_id }
+
+	input:
+	set pair_id, file(estimates) from estimates_mtx_for_plots
+	file ("barcode_file.txt") from barcodeFile
+	file annotationFile
+    file configFile
+
+	output:
+	set pair_id, file ("*.rds")  into estimates_rds
+
+	script:		
+    """
+    tail -n +3  ${estimates} |awk '{if (\$3>0) print \$2}'|sort|uniq -c >  ${estimates}_stats.txt
+	plot.histogram.r ${estimates}_stats.txt ${pair_id}.est.pdf ${pair_id}
+    """
+
+*/
+
+/*
+*
+*/
 process dropReport {
 	publishDir est_folder
 	tag { pair_id }
 
 	input:
-	set pair_id, file(estimate) from estimates
+	set pair_id, file(estimate) from estimates_rds
 
 	output:
-	set pair_id, file ("*")  into out
+	set pair_id, file ("report.html")  into outreport
 
 	script:		
     """
-    dropReport.Rsc ${estimate}
+    /scripts/dropEst/dropReport.Rsc -o report.html ${estimate} 
     """
 }
-*/
+
 
 /*
  * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
