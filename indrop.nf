@@ -239,7 +239,7 @@ process histCell {
 
 /*
 *
-*/
+
 process dropReport {
 	publishDir est_folder
 	tag { pair_id }
@@ -252,10 +252,11 @@ process dropReport {
 
 	script:		
     """
-    /scripts/dropEst/dropReport.Rsc -o report.html ${estimate} 
+    dropReport.Rsc ${estimate}
     """
 }
 
+*/
 
 /*
  * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
