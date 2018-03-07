@@ -32,8 +32,7 @@ outputQC		= "${outputfolder}/QC"
 outputMapping   = "${outputfolder}/Alignments";
 filt_folder		= "${outputfolder}/Tagged_reads";
 est_folder		= "${outputfolder}/Estimated_counts";
-plots_folder	= "${outputfolder}/Plots";
-
+rep_folder		= "${outputfolder}/Reports";
 
 if( !barcodeFile.exists() ) exit 1, "Missing barcode file: ${barcodeFile}"
 if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
@@ -241,10 +240,9 @@ process histCell {
 *
 */
 process dropReport {
-	publishDir est_folder
+	publishDir rep_folder
 	tag { pair_id }
     errorStrategy 'ignore'
-    echo true
 
 	input:
 	set pair_id, file(estimate) from estimates_rds
@@ -254,7 +252,7 @@ process dropReport {
 
 	script:		
     """
-    dropReport.Rsc -o ${pair_id}_report.html ${estimate} > /dev/null
+    dropReport.Rsc -o ${pair_id}_report.html ${estimate}
     """
 }
 
