@@ -239,24 +239,26 @@ process histCell {
 
 /*
 *
-
+*/
 process dropReport {
 	publishDir est_folder
 	tag { pair_id }
+    errorStrategy 'ignore'
+    echo true
 
 	input:
 	set pair_id, file(estimate) from estimates_rds
 
 	output:
-	set pair_id, file ("report.html")  into outreport
+	set pair_id, file ("${pair_id}_report.html")  into outreport
 
 	script:		
     """
-    dropReport.Rsc ${estimate}
+    dropReport.Rsc -o ${pair_id}_report.html ${estimate} > /dev/null
     """
 }
 
-*/
+
 
 /*
  * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
