@@ -5,22 +5,33 @@
  * Define the pipeline parameters
  *
  */
- 
 
-log.info "BIOCORE@CRG RNASeq - N F  ~  version 0.1"
-log.info "========================================"
-log.info "pairs               		 : ${params.pairs}"
-log.info "genome               		 : ${params.genome}"
-log.info "annotation           	     : ${params.annotation}"
-log.info "config             	     : ${params.config}"
-log.info "barcode_list               : ${params.barcode_list}"
-log.info "output (output folder) 	 : ${params.output}"
-log.info "email for notification 	 : ${params.email}"
-log.info "\n"
+// Pipeline version
+version = '1.0'
+
+params.help            = false
+params.resume          = false
+
+log.info """
+
+╔╗ ┬┌─┐┌─┐┌─┐┬─┐┌─┐╔═╗╦═╗╔═╗  ┬┌┐┌┌┬┐┬─┐┌─┐┌─┐╔═╗╔═╗╔═╗ 
+╠╩╗││ ││  │ │├┬┘├┤ ║  ╠╦╝║ ╦  ││││ ││├┬┘│ │├─┘╚═╗║╣ ║═╬╗
+╚═╝┴└─┘└─┘└─┘┴└─└─┘╚═╝╩╚═╚═╝  ┴┘└┘─┴┘┴└─└─┘┴  ╚═╝╚═╝╚═╝╚
+                                                                                       
+====================================================
+BIOCORE@CRG indropSEQ - N F  ~  version ${version}
+====================================================
+pairs                         : ${params.pairs}
+genome                        : ${params.genome}
+annotation                    : ${params.annotation}
+config                        : ${params.config}
+barcode_list                  : ${params.barcode_list}
+email                         : ${params.email}
+output (output folder)        : ${params.output}
+"""
 
 if (params.help) exit 1
 if (params.resume) exit 1, "Are you making the classical --resume typo? Be careful!!!! ;)"
-
 
 genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
@@ -29,6 +40,7 @@ barcodeFile        	= file(params.barcode_list)
 
 outputfolder    = "${params.output}"
 outputQC		= "${outputfolder}/QC"
+outputMultiQC	= "${outputfolder}/multiQC"
 outputMapping   = "${outputfolder}/Alignments";
 filt_folder		= "${outputfolder}/Tagged_reads";
 est_folder		= "${outputfolder}/Estimated_counts";
@@ -50,7 +62,12 @@ if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFil
 Channel
     .fromFilePairs( params.pairs )                                             
     .ifEmpty { error "Cannot find any reads matching: ${params.pairs}" }  
-    .into { read_pairs; reads_for_fastqc; fastq_files_for_size_est }
+    .set { read_pairs }
+
+Channel
+    .fromPath( params.pairs )                                             
+    .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
+    .into { reads_for_fastqc; fastq_files_for_size_est}    
 
 
 /*
@@ -62,16 +79,14 @@ process QConRawReads {
 	tag { read }
 
     input:
-    set pair_id, file(read) from reads_for_fastqc
+    file(read) from reads_for_fastqc
 
-     output:
-   	 file("*_fastqc.*") into raw_fastqc_files
+    output:
+   	file("*_fastqc.*") into raw_fastqc_files
 
-     script:
-
-    """
-		fastqc ${read} 
-    """
+    script:
+    def qc = new QualityChecker(input:read, cpus:task.cpus)
+	qc.fastqc()
 }
 
     
@@ -80,6 +95,7 @@ process QConRawReads {
  */
 process dropTag {    
 	publishDir filt_folder
+	label 'indrop'
 
 	tag { pair_id }
 
@@ -88,8 +104,8 @@ process dropTag {
     file configFile
     
     output:
-    set pair_id, "${pair_id}_tagged.fastq.gz" into tagged_files_for_alignment
-    set pair_id, "${pair_id}_tagged.fastq.gz" into tagged_files_for_fastqc
+    set pair_id, file("${pair_id}_tagged.fastq.gz") into tagged_files_for_alignment
+    file("${pair_id}_tagged.fastq.gz") into tagged_files_for_fastqc
   
     """
 		droptag -S -p ${task.cpus} -c ${configFile} ${reads}
@@ -107,19 +123,17 @@ process dropTag {
 process QCFiltReads {
 	publishDir outputQC
 
-	tag { pair_id }
+	tag { filtered_read }
 
-   	 input:
-     set pair_id, file(filtered_read) from tagged_files_for_fastqc
+   	input:
+    file(filtered_read) from tagged_files_for_fastqc.flatten()
 
-     output:
-   	 file("*_fastqc.*") into trimmed_fastqc_files
+    output:
+   	file("*_fastqc.*") into trimmed_fastqc_files
 
-     script:
-
-    """
-		fastqc ${filtered_read}
-    """
+    script:
+    def qc = new QualityChecker(input:filtered_read, cpus:task.cpus)
+	qc.fastqc()
    }
 
 /*
@@ -127,19 +141,17 @@ process QCFiltReads {
 */
 
 process getReadLength {   
-	tag { fastq_files_for_size_est[1] }
+	tag { fastq_file_for_size_est }
 
     input: 
-     set pair_id, file(fastq_files_for_size_est) from fastq_files_for_size_est.first()
-
+    file(fastq_file_for_size_est) from fastq_files_for_size_est.first()
  
 	output: 
 	stdout into read_length
 
-
-    """
-    estim_read_size.sh ${fastq_files_for_size_est[1]}
-    """
+ 	script:
+ 	def qc = new QualityChecker(input:fastq_file_for_size_est)
+ 	qc.getReadSize()
 } 
 
 
@@ -150,6 +162,7 @@ process getReadLength {
     
 process buildIndex {
 	tag { genomeFile }
+	label 'index_mem_cpus'
 
     input:
     file genomeFile
@@ -158,20 +171,18 @@ process buildIndex {
 
     output:
     file "STARgenome" into STARgenomeIndex
-
-    echo true
     
-    """
-    echo read size is ${read_size}
-	index_star.sh ${genomeFile} STARgenome STARgenome ${annotationFile} ${read_size-1} ${task.cpus}
-    """
+    script:
+    def aligner = new NGSaligner(reference_file:genomeFile, index:"STARgenome", annotation_file:annotationFile, read_size:read_size-1, cpus:task.cpus)
+    aligner.doIndexing("STAR")
 }
 
- /*
+/*
  * Step 5. Mapping with STAR
  */
 
 process mapping {
+	label 'big_mem_cpus'
 	publishDir outputMapping
 	tag { pair_id }
 
@@ -184,12 +195,15 @@ process mapping {
 	set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_qualimap
     set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_multiQC
 
-	script:		
-	mappingPairs( pair_id, STARgenome, reads, task.cpus)  
+    script:
+    def aligner = new NGSaligner(id:pair_id, reads:reads, index:STARgenome, cpus:task.cpus, output:"STAR_${pair_id}") 
+    aligner.doAlignment("STAR")  
+
 }
 
 
 process dropEst {
+	label 'indrop'
 	publishDir est_folder
 	tag { pair_id }
 
@@ -240,6 +254,7 @@ process histCell {
 *
 */
 process dropReport {
+	label 'indrop'
 	publishDir rep_folder
 	tag { pair_id }
     errorStrategy 'ignore'
@@ -262,6 +277,7 @@ process dropReport {
  * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
 
 process qualimap {
+	label 'big_mem_cpus'
     publishDir stat_folder, mode: 'copy'
 
     input:
@@ -286,7 +302,7 @@ process qualimap {
  * Step 7. Multi QC.
 
 	process multiQC_unfiltered {
-	    publishDir outputQC
+	    publishDir outputMultiQC
 
 	    input:
         file multiconfig
@@ -298,7 +314,7 @@ process qualimap {
 	    file '*' from QualiMap.collect()
 
 	    output:
- 	   file("multiqc_report.html") into multiQC 
+ 	    file("multiqc_report.html") into multiQC 
 	
 	    script:
 		 //
@@ -308,19 +324,14 @@ process qualimap {
  	    check_tool_version.pl -l fastqc,star,skewer,qualimap,ribopicker,bedtools,samtools > tools_mqc.txt
 	    multiqc -c ${multiconfig} .
 	    """
-
 }
 
 */
 
-/*
- * Mail notification
-
- 
 workflow.onComplete {
-    def subject = 'indrop execution'
+    def subject = 'indropSeq execution'
     def recipient = "${params.email}"
-    def attachment = "${outputQC}/multiqc_report.html"
+    def attachment = "${outputMultiQC}/multiqc_report.html"
 
     ['mail', '-s', subject, '-a', attachment, recipient].execute() << """
 
@@ -334,27 +345,7 @@ workflow.onComplete {
     Error report: ${workflow.errorReport ?: '-'}
     """
 }
- */
 
-/*
-* ************** CUSTOM FUNCTIONS ****************
-*/
 
-def mappingPairs( pair_id, STARgenome, reads, cpus) { 
-    """
-		STAR --genomeDir ${STARgenome} \
-				 --readFilesIn ${reads} \
-				 --outSAMunmapped None \
-				 --outSAMtype BAM SortedByCoordinate \
-				 --runThreadN ${cpus} \
-				 --quantMode GeneCounts \
-				 --outFileNamePrefix ${pair_id} \
-				 --readFilesCommand zcat			 	
 
-			mkdir STAR_${pair_id}
-			mv ${pair_id}Aligned* STAR_${pair_id}/.
-			mv ${pair_id}SJ* STAR_${pair_id}/.
-			mv ${pair_id}ReadsPerGene* STAR_${pair_id}/.
-			mv ${pair_id}Log* STAR_${pair_id}/.   
-    """
-}
+
