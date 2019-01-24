@@ -66,12 +66,12 @@ if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitoc
 Channel
     .fromFilePairs( params.pairs )                                             
     .ifEmpty { error "Cannot find any reads matching: ${params.pairs}" }  
-    .set { read_pairs }
+    .into { read_pairs; fastq_files_for_size_est}
 
 Channel
     .fromPath( params.pairs )                                             
     .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
-    .into { reads_for_fastqc; fastq_files_for_size_est}    
+    .set { reads_for_fastqc}    
 
 
 /*
@@ -146,16 +146,18 @@ process QCFiltReads {
 */
 
 process getReadLength {   
-    tag { fastq_file_for_size_est }
+    tag { pairid }
 
     input: 
-    file(fastq_file_for_size_est) from fastq_files_for_size_est.first()
+    
+    set pairid, file(fastq_files) from fastq_files_for_size_est.first()
  
     output: 
     stdout into read_length
 
     script:
-    def qc = new QualityChecker(input:fastq_file_for_size_est)
+    def right_pair = fastq_files.last()
+    def qc = new QualityChecker(input:right_pair)
     qc.getReadSize()
 } 
 
