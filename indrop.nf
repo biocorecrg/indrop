@@ -27,7 +27,9 @@ annotation                    : ${params.annotation}
 config                        : ${params.config}
 barcode_list                  : ${params.barcode_list}
 email                         : ${params.email}
+mtgenes                       : ${params.mitocgenes}
 output (output folder)        : ${params.output}
+storeIndex
 """
 
 if (params.help) exit 1
@@ -37,18 +39,20 @@ genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
 configFile          = file(params.config) 
 barcodeFile         = file(params.barcode_list) 
+mitocgenesFile      = file(params.mitocgenes)
 
 outputfolder    = "${params.output}"
 outputQC        = "${outputfolder}/QC"
 outputMultiQC   = "${outputfolder}/multiQC"
-outputMapping   = "${outputfolder}/Alignments";
-filt_folder     = "${outputfolder}/Tagged_reads";
-est_folder      = "${outputfolder}/Estimated_counts";
-rep_folder      = "${outputfolder}/Reports";
+outputMapping   = "${outputfolder}/Alignments"
+filt_folder     = "${outputfolder}/Tagged_reads"
+est_folder      = "${outputfolder}/Estimated_counts"
+rep_folder      = "${outputfolder}/Reports"
 
 if( !barcodeFile.exists() ) exit 1, "Missing barcode file: ${barcodeFile}"
 if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
 if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFile}"
+if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
 
 /*
 * if (params.strand == "yes") qualiOption = "strand-specific-forward"
@@ -104,14 +108,15 @@ process dropTag {
     file configFile
     
     output:
-    set pair_id, file("${pair_id}_tagged.fastq.gz") into tagged_files_for_alignment
-    file("${pair_id}_tagged.fastq.gz") into tagged_files_for_fastqc
+    set pair_id, file("*.tagged.1.fastq.gz") into tagged_files_for_alignment
+    file("*.tagged.1.fastq.gz") into tagged_files_for_fastqc
+    set pair_id, file("*.tagged.params.gz") into params_files_for_estimation
+    set pair_id, file("*.tagged.rds") into tagged_rds_for_report
   
+    //zcat *.tagged.*.gz >> ${pair_id}_tagged.fastq
+    //gzip ${pair_id}_tagged.fastq 
     """
-        droptag -S -p ${task.cpus} -c ${configFile} ${reads}
-        zcat *.tagged.*.gz >> ${pair_id}_tagged.fastq
-        gzip ${pair_id}_tagged.fastq
-        rm  *.fastq.gz.tagged.*.gz
+        droptag -S -s -p ${task.cpus} -c ${configFile} ${reads}
     """
 }   
 
@@ -164,6 +169,7 @@ process buildIndex {
     tag { genomeFile }
     label 'index_mem_cpus'
 
+
     input:
     file genomeFile
     file annotationFile
@@ -208,7 +214,7 @@ process dropEst {
     tag { pair_id }
 
     input:
-    set pair_id, file(tags) from STARmappedTags_for_est
+    set pair_id, file(tags), file(params_est) from STARmappedTags_for_est.join(params_files_for_estimation)
     file ("barcode_file.txt") from barcodeFile
     file annotationFile
     file configFile
@@ -221,7 +227,7 @@ process dropEst {
 
     script:     
     """
-    dropest -m -w -g ${annotationFile} -c ${configFile} -o ${pair_id}.est ${tags} 
+    dropest -r ${params_est} -m -w -g ${annotationFile} -c ${configFile} -o ${pair_id}.est ${tags} 
     """
     
 
@@ -254,64 +260,34 @@ process histCell {
 *
 */
 process dropReport {
-    label 'indrop'
-    publishDir rep_folder
+    label 'dropReport'
+    publishDir rep_folder, mode: 'copy'
     tag { pair_id }
-    errorStrategy 'ignore'
 
     input:
-    set pair_id, file(estimate) from estimates_rds
-
+    set pair_id, file(estimate), file (droptag) from estimates_rds.join(tagged_rds_for_report)
+    file(mitocgenes) from mitocgenesFile
+    
     output:
     set pair_id, file ("${pair_id}_report.html")  into outreport
 
     script:     
     """
-    dropReport.Rsc -o ${pair_id}_report.html ${estimate}
+    dropReport.Rsc -t ${droptag} -o ${pair_id}_report.html -m ${mitocgenes} ${estimate} 
     """
 }
 
 
 
 /*
- * Step 6. QualiMap QC. The default is using strand-specific-reverse. Should we try both directions? // better multiQC // we should try...
-
-process qualimap {
-    label 'big_mem_cpus'
-    publishDir stat_folder, mode: 'copy'
-
-    input:
-    file annotationFile
-
-    set pair_id, file(bamfolder) from STARmappedFolders_for_qualimap
-
-    output:
-    set pair_id, file("QUALIMAP_${pair_id}") into QualiMap
-
-    script:
-    //
-    // Qualimap
-    //
-    """
-    unset DISPLAY
-    qualimap rnaseq --java-mem-size=16G -bam "${bamfolder}/${pair_id}Aligned.sortedByCoord.out.bam" -gtf ${annotationFile} -outdir "QUALIMAP_${pair_id}" -p ${qualiOption}
-    """
-}
-
-
  * Step 7. Multi QC.
-
+*/
     process multiQC_unfiltered {
         publishDir outputMultiQC
 
         input:
-        file multiconfig
-        file ribo_report
         file '*' from raw_fastqc_files.collect()
-        file '*' from trimmed_fastqc_files.collect()        
         file '*' from STARmappedFolders_for_multiQC.collect()
-        file '*' from logTrimming_for_QC.collect()
-        file '*' from QualiMap.collect()
 
         output:
         file("multiqc_report.html") into multiQC 
@@ -319,15 +295,16 @@ process qualimap {
         script:
          //
          // multiqc
+         // check_tool_version.pl -l fastqc,star,skewer,qualimap,ribopicker,bedtools,samtools > tools_mqc.txt
          //
         """
-        check_tool_version.pl -l fastqc,star,skewer,qualimap,ribopicker,bedtools,samtools > tools_mqc.txt
-        multiqc -c ${multiconfig} .
+        multiqc .
         """
 }
 
+/*
+* send mail
 */
-
 workflow.onComplete {
     def subject = 'indropSeq execution'
     def recipient = "${params.email}"
