@@ -19,6 +19,9 @@ https://github.com/hms-dbmi/dropEst
   * UMI
 * File 2: gene reads
 
+## Install
+1. install docker or singularity.
+1. sh INSTALL.sh for checking Nextflow and installing bioNextflow
 
 ## The pipeline
 1. QC: Run FastQC on raw reads. It stores the results within **QC** folder.
