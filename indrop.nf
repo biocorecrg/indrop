@@ -237,6 +237,7 @@ process dropEst {
 
 /*
 *
+*/ 
 process histCell {
     publishDir plots_folder
     tag { pair_id }
@@ -256,7 +257,6 @@ process histCell {
     plot.histogram.r ${estimates}_stats.txt ${pair_id}.est.pdf ${pair_id}
     """
 
-*/
 
 /*
 *
