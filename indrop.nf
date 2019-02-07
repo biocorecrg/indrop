@@ -209,7 +209,10 @@ process mapping {
 
 }
 
-
+/*
+ * Step 5. Estimation of single cell transcriptomes 
+ */
+ 
 process dropEst {
     label 'indrop'
     publishDir est_folder
@@ -235,27 +238,6 @@ process dropEst {
 
 }
 
-/*
-*
-*/ 
-process histCell {
-    publishDir plots_folder
-    tag { pair_id }
-
-    input:
-    set pair_id, file(estimates) from estimates_mtx_for_plots
-    file ("barcode_file.txt") from barcodeFile
-    file annotationFile
-    file configFile
-
-    output:
-    set pair_id, file ("*.rds")  into estimates_rds
-
-    script:     
-    """
-    tail -n +3  ${estimates} |awk '{if (\$3>0) print \$2}'|sort|uniq -c >  ${estimates}_stats.txt
-    plot.histogram.r ${estimates}_stats.txt ${pair_id}.est.pdf ${pair_id}
-    """
 
 
 /*
