@@ -27,7 +27,7 @@ annotation                    : ${params.annotation}
 config                        : ${params.config}
 barcode_list                  : ${params.barcode_list}
 email                         : ${params.email}
-mtgenes                       : ${params.mitocgenes}
+mtgenes                       : ${params.mtgenes}
 output (output folder)        : ${params.output}
 storeIndex
 """
@@ -39,7 +39,7 @@ genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
 configFile          = file(params.config) 
 barcodeFile         = file(params.barcode_list) 
-mitocgenesFile      = file(params.mitocgenes)
+mitocgenesFile      = file(params.mtgenes)
 
 outputfolder    = "${params.output}"
 outputQC        = "${outputfolder}/QC"
@@ -75,7 +75,26 @@ Channel
 
 
 /*
- * Step 0. Run FastQC on raw data
+ * Transform gene list in RDS
+*/
+process MitoGeneToRDS {
+   label 'dropReport'
+   tag { mitocgenesFile }
+
+    input:
+    file(mitoc) from mitocgenesFile
+
+    output:
+    file("mitoc.rds") into mitocRDS
+
+    script:
+	"""
+	R --slave -e \'a<-read.table("${mitoc}"); b<-as.vector(a\$V1); saveRDS(b, "mitoc.rds")\'
+	"""
+}
+
+/*
+ * Run FastQC on raw data
 */
 process QConRawReads {
     publishDir outputQC
@@ -95,7 +114,7 @@ process QConRawReads {
 
     
 /*
- * Step 1. Launch droptag for tagging your files
+ * Launch droptag for tagging your files
  */
 process dropTag {    
     publishDir filt_folder
@@ -108,21 +127,21 @@ process dropTag {
     file configFile
     
     output:
-    set pair_id, file("*.tagged.1.fastq.gz") into tagged_files_for_alignment
-    file("*.tagged.1.fastq.gz") into tagged_files_for_fastqc
+    set pair_id, file("*.tagged.fastq.gz") into tagged_files_for_alignment
+    file("*.tagged.fastq.gz") into tagged_files_for_fastqc
     set pair_id, file("*.tagged.params.gz") into params_files_for_estimation
     set pair_id, file("*.tagged.rds") into tagged_rds_for_report
   
     //zcat *.tagged.*.gz >> ${pair_id}_tagged.fastq
     //gzip ${pair_id}_tagged.fastq 
     """
-        droptag -S -s -p ${task.cpus} -c ${configFile} ${reads}
+        droptag -r 0 -S -s -p ${task.cpus} -c ${configFile} ${reads}
     """
 }   
 
 
 /*
- * Step 2. FastQC of your trimmed files
+ * FastQC of your trimmed files
  */
 
 process QCFiltReads {
@@ -142,7 +161,7 @@ process QCFiltReads {
    }
 
 /*
- * Step 3 extract read length of filtered reads?
+ * Extract read length of filtered reads?
 */
 
 process getReadLength {   
@@ -163,7 +182,7 @@ process getReadLength {
 
 
  /*
- * Step 4. Builds the genome index required by the mapping process
+ * Builds the genome index required by the mapping process
  */
 
     
@@ -186,7 +205,7 @@ process buildIndex {
 }
 
 /*
- * Step 5. Mapping with STAR
+ * Mapping with STAR
  */
 
 process mapping {
@@ -209,12 +228,9 @@ process mapping {
 
 }
 
-/*
- * Step 5. Estimation of single cell transcriptomes 
- */
- 
+
 process dropEst {
-    label 'indrop'
+    label 'indrop_one'
     publishDir est_folder
     tag { pair_id }
 
@@ -239,7 +255,6 @@ process dropEst {
 }
 
 
-
 /*
 *
 */
@@ -250,14 +265,14 @@ process dropReport {
 
     input:
     set pair_id, file(estimate), file (droptag) from estimates_rds.join(tagged_rds_for_report)
-    file(mitocgenes) from mitocgenesFile
+    file(mitocRDS)
     
     output:
     set pair_id, file ("${pair_id}_report.html")  into outreport
 
     script:     
     """
-    dropReport.Rsc -t ${droptag} -o ${pair_id}_report.html -m ${mitocgenes} ${estimate} 
+    dropReport.Rsc -t ${droptag} -o ${pair_id}_report.html -m ${mitocRDS} ${estimate} 
     """
 }
 

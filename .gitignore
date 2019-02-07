@@ -1,5 +1,8 @@
+anno/
+conf_tools.txt
+data/
+lib/
 simul
-jochen_stuff
 test
 work/
 output/
