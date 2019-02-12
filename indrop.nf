@@ -1,17 +1,9 @@
 #!/usr/bin/env nextflow
 
-/* 
- * Copyright (c) 2019, Centre for Genomic Regulation (CRG) 
- * 
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. 
- */
- 
+
 /* 
  * Define the pipeline parameters
- * 
- * Author Luca Cozzuto
+ *
  */
 
 // Pipeline version
@@ -86,9 +78,9 @@ Channel
  * Transform gene list in RDS
 */
 process MitoGeneToRDS {
-   label 'dropReport'
+   label 'indrop_one_cpu'
    tag { mitocgenesFile }
-
+   
     input:
     file(mitoc) from mitocgenesFile
 
@@ -126,7 +118,7 @@ process QConRawReads {
  */
 process dropTag {    
     publishDir filt_folder
-    label 'indrop'
+    label 'indrop_multi_cpus'
 
     tag { pair_id }
 
@@ -238,7 +230,7 @@ process mapping {
 
 
 process dropEst {
-    label 'indrop_one'
+    label 'indrop_one_cpu'
     publishDir est_folder
     tag { pair_id }
 
@@ -267,7 +259,8 @@ process dropEst {
 *
 */
 process dropReport {
-    label 'dropReport'
+    label 'indrop_one_cpu'
+    errorStrategy = 'ignore'
     publishDir rep_folder, mode: 'copy'
     tag { pair_id }
 
