@@ -210,7 +210,6 @@ process buildIndex {
 
 process mapping {
     label 'big_mem_cpus'
-    publishDir outputMapping
     tag { pair_id }
 
     input:
@@ -218,16 +217,40 @@ process mapping {
     set pair_id, file(reads) from tagged_files_for_alignment    
 
     output:
-    set pair_id, file("STAR_${pair_id}/${pair_id}Aligned.sortedByCoord.out.bam") into STARmappedTags_for_est
+    set pair_id, file("STAR_${pair_id}/${pair_id}Aligned.sortedByCoord.out.bam") into STARmappedTags_for_filter
     set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_qualimap
     set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_multiQC
 
+// To add --outFilterMultimapNmax 1?
     script:
     def aligner = new NGSaligner(id:pair_id, reads:reads, index:STARgenome, cpus:task.cpus, output:"STAR_${pair_id}") 
     aligner.doAlignment("STAR")  
 
 }
 
+/*
+ * Removing multi-mapping
+ */
+
+process removeMultimapping {
+    publishDir outputMapping
+    label 'big_mem_cpus'
+    tag { pair_id }
+
+    input:
+    set pair_id, file(aln) from STARmappedTags_for_filter    
+
+    output:
+    set pair_id, file ("${pair_id}_univoc_s.bam") into STARmappedTags_for_est
+    
+    script:
+	"""
+	samtools view -H ${aln} > ${pair_id}_univoc_s.sam
+	samtools view -@ ${task.cpus} ${aln} | grep \"\\<NH:i:1\\>\" >> ${pair_id}_univoc_s.sam
+	samtools view -@ ${task.cpus} -Sb ${pair_id}_univoc_s.sam > ${pair_id}_univoc_s.bam 
+	"""
+ 
+}
 
 process dropEst {
     label 'indrop_one_cpu'
