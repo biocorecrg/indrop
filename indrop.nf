@@ -28,6 +28,7 @@ config                        : ${params.config}
 barcode_list                  : ${params.barcode_list}
 email                         : ${params.email}
 mtgenes                       : ${params.mtgenes}
+version                       : ${params.version}
 output (output folder)        : ${params.output}
 storeIndex
 """
@@ -54,6 +55,8 @@ if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
 if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFile}"
 if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
 
+if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
+
 /*
 * if (params.strand == "yes") qualiOption = "strand-specific-forward"
 * else if (params.strand != "no") qualiOption = "non-strand-specific"
@@ -64,9 +67,9 @@ if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitoc
  * three elements: the pair ID, the first read-pair file and the second read-pair file
  */
 Channel
-    .fromFilePairs( params.pairs )                                             
+    .fromFilePairs( params.pairs, size: (params.version != "3") ? 2 : 4)                                          
     .ifEmpty { error "Cannot find any reads matching: ${params.pairs}" }  
-    .into { read_pairs; fastq_files_for_size_est}
+    .into { read_pairs; fastq_files_for_size_est; luca}
 
 Channel
     .fromPath( params.pairs )                                             
@@ -134,9 +137,11 @@ process dropTag {
   
     //zcat *.tagged.*.gz >> ${pair_id}_tagged.fastq
     //gzip ${pair_id}_tagged.fastq 
+    script:
     """
         droptag -r 0 -S -s -p ${task.cpus} -c ${configFile} ${reads}
     """
+    
 }   
 
 
@@ -248,6 +253,7 @@ process removeMultimapping {
 	samtools view -H ${aln} > ${pair_id}_univoc_s.sam
 	samtools view -@ ${task.cpus} ${aln} | grep \"\\<NH:i:1\\>\" >> ${pair_id}_univoc_s.sam
 	samtools view -@ ${task.cpus} -Sb ${pair_id}_univoc_s.sam > ${pair_id}_univoc_s.bam 
+	rm ${pair_id}_univoc_s.sam
 	"""
  
 }
