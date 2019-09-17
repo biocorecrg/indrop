@@ -23,6 +23,9 @@ https://github.com/hms-dbmi/dropEst
 1. install docker or singularity.
 1. sh INSTALL.sh for checking Nextflow and installing bioNextflow
 
+# Parameters
+1. Parameters are specified within the **params.config** file
+
 ## The pipeline
 1. QC: Run FastQC on raw reads. It stores the results within **QC** folder.
 1. Indexing: It makes the index of the genome by using STAR.
