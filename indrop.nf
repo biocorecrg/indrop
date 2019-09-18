@@ -29,6 +29,7 @@ barcode_list                  : ${params.barcode_list}
 email                         : ${params.email}
 mtgenes                       : ${params.mtgenes}
 version                       : ${params.version}
+library_tag                   : ${params.library_tag}
 output (output folder)        : ${params.output}
 storeIndex
 """
@@ -54,7 +55,6 @@ if( !barcodeFile.exists() ) exit 1, "Missing barcode file: ${barcodeFile}"
 if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
 if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFile}"
 if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
-
 if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
 
 /*
@@ -62,20 +62,22 @@ if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitoc
 * else if (params.strand != "no") qualiOption = "non-strand-specific"
 */
 
+if (params.version != "1-2" && params.version != "3_3" && params.version != "3_4") 
+	exit 1, "Please define a valid version! It can be 1-2, 3_3, 3_4.\nRespectively version 1 or 2, version 3 with 3 files and version 4 with 4 files."
+
 /*
  * Creates the `read_pairs` channel that emits for each read-pair a tuple containing
  * three elements: the pair ID, the first read-pair file and the second read-pair file
  */
 Channel
-    .fromFilePairs( params.pairs, size: (params.version != "3") ? 2 : 4)                                          
+    .fromFilePairs( params.pairs, size: (params.version == "1-2") ? 2 : (params.version == "3-3") ? 3 : 4)                                          
     .ifEmpty { error "Cannot find any reads matching: ${params.pairs}" }  
-    .into { read_pairs; fastq_files_for_size_est; luca}
+    .into { read_pairs; fastq_files_for_size_est; ciccio}
 
 Channel
     .fromPath( params.pairs )                                             
     .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
     .set { reads_for_fastqc}    
-
 
 /*
  * Transform gene list in RDS
@@ -115,7 +117,35 @@ process QConRawReads {
     qc.fastqc()
 }
 
-    
+seqs = Channel.create()
+fastq_file_for_size_est = Channel.create()
+
+if (params.version == "3_4") {
+	read_pairs.map{
+		[it[0], [it[1][1], it[1][3], it[1][0], it[1][2] ]]
+	}.set{ reads}
+	
+	fastq_files_for_size_est.map{
+		[it[0], [it[1][0]]]
+	}.set{ fastq_file_for_size_est}
+}    
+else if (params.version == "3_3") {
+	read_pairs.map{
+		[it[0], [it[1][1], it[1][2], it[1][0] ]]
+	}.set{ reads}
+	
+	fastq_files_for_size_est.map{
+		[it[0], [it[1][0]]]
+	}.set{ fastq_file_for_size_est}	
+} else {
+	seqs.set{reads}
+	fastq_files_for_size_est.fist.map{
+		[it[0], [it[1][1]]]
+	}.set{ fastq_file_for_size_est}
+}
+
+
+
 /*
  * Launch droptag for tagging your files
  */
@@ -126,7 +156,7 @@ process dropTag {
     tag { pair_id }
 
     input:
-    set pair_id, file(reads) from read_pairs
+    set pair_id, file(reads) from seqs
     file configFile
     
     output:
@@ -138,8 +168,12 @@ process dropTag {
     //zcat *.tagged.*.gz >> ${pair_id}_tagged.fastq
     //gzip ${pair_id}_tagged.fastq 
     script:
+    def v3_params = ""
+    if (params.library_tag != "") {
+    	v3_params = "-t ${params.library_tag}"
+    }
     """
-        droptag -r 0 -S -s -p ${task.cpus} -c ${configFile} ${reads}
+        droptag -r 0 -S -s ${v3_params} -p ${task.cpus} -c ${configFile} ${seqs}
     """
     
 }   
@@ -174,14 +208,13 @@ process getReadLength {
 
     input: 
     
-    set pairid, file(fastq_files) from fastq_files_for_size_est.first()
+    set pairid, file(fastq_file) from fastq_file_for_size_est
  
     output: 
     stdout into read_length
 
     script:
-    def right_pair = fastq_files.last()
-    def qc = new QualityChecker(input:right_pair)
+    def qc = new QualityChecker(input:fastq_file)
     qc.getReadSize()
 } 
 
