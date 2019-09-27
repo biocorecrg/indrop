@@ -20,7 +20,9 @@
     <!-- dropest -->
     <Estimation>
         <Merge>
-            <barcodes_file>../data/barcodes/indrop_v3</barcodes_file>
+            <!-- don't change this! START -->
+            <barcodes_file>barcode_file.txt</barcodes_file>
+            <!-- END -->
             <barcodes_type>indrop</barcodes_type>
             <min_merge_fraction>0.2</min_merge_fraction>
             <max_cb_merge_edit_distance>2</max_cb_merge_edit_distance>
