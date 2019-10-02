@@ -21,6 +21,7 @@ https://github.com/hms-dbmi/dropEst
 
 ## Install
 1. install docker or singularity.
+1. git clone https://github.com/biocorecrg/indrop.git; cd indrop
 1. sh INSTALL.sh for checking Nextflow and installing bioNextflow
 
 # Parameters
