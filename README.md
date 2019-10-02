@@ -10,14 +10,33 @@ Indrops analysis pipeline at BioCore@CRG
 The pipeline is based on the DropEST tool:
 https://github.com/hms-dbmi/dropEst
 
-## The current supported version is v1 & v2
-
+## We support versions v1, v2 and v3
+### Version 1 and 2
+**Parameter version: "V1-2"**
 * File 1: barcode reads. Structure:
   * Cell barcode, part 1
   * Spacer
   * Cell barcode, part 2
   * UMI
 * File 2: gene reads
+
+### Version 3
+**Parameter version: "V3_3"**
+* File 1: cell barcode
+* File 2: 
+  * cell barcode 
+  * UMI 
+* File 3: gene read
+
+**Parameter version: "V3_4"**
+* File 1: cell barcode
+* File 2: 
+  * cell barcode 
+  * UMI 
+* File 3: gene read
+* File 4: library_tag
+
+The parameter library_tag is only needed with version **V3_4**
 
 ## Install
 1. install docker or singularity.
