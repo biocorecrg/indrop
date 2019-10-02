@@ -10,7 +10,51 @@ Indrops analysis pipeline at BioCore@CRG
 The pipeline is based on the DropEST tool:
 https://github.com/hms-dbmi/dropEst
 
-## We support versions v1, v2 and v3
+
+## Installing
+1. install docker or singularity.
+1. git clone https://github.com/biocorecrg/indrop.git; cd indrop
+1. sh INSTALL.sh for checking Nextflow and installing bioNextflow
+
+## Running the pipeline
+The parameters are listed when using ```nextflow run indrop.nf --help``` command.
+
+```
+nextflow run indrop.nf --help
+N E X T F L O W  ~  version 19.07.0
+Launching `indrop.nf` [gigantic_ride] - revision: 17bd0ef49f
+╔╗ ┬┌─┐┌─┐┌─┐┬─┐┌─┐╔═╗╦═╗╔═╗  ┬┌┐┌┌┬┐┬─┐┌─┐┌─┐╔═╗╔═╗╔═╗ 
+╠╩╗││ ││  │ │├┬┘├┤ ║  ╠╦╝║ ╦  ││││ ││├┬┘│ │├─┘╚═╗║╣ ║═╬╗
+╚═╝┴└─┘└─┘└─┘┴└─└─┘╚═╝╩╚═╚═╝  ┴┘└┘─┴┘┴└─└─┘┴  ╚═╝╚═╝╚═╝╚
+                                                                                       
+====================================================
+BIOCORE@CRG indropSEQ - N F  ~  version 1.0
+====================================================
+pairs                         : {PATH}/*R{1,2,3,4}.fastq.gz
+genome                        : {PATH}/anno/test.fa.gz
+annotation                    : {PATH}/anno/gencode.v28.annotation.gtf
+config                        : {PATH}/conf/indrop_v3.xml
+barcode_list                  : {PATH}/conf/indrop_v3_barcodes.txt
+email                         : yourmail@yourdomain
+mtgenes                       : {PATH}/anno/mitoc_genes.txt
+version                       : 3_4
+library_tag                   : AGATATAA
+output (output folder)        : output_v3
+```
+
+You can change them either by using the command line:
+```
+nextflow run indrop.nf --pairs "data/{1,2}.fastq.gz" --version 1-2 > log
+```
+or changing the params.file
+You can use the nextflow options for sending the execution in background (-bg) or resuming a failed one (-resume).
+
+```
+nextflow run indrop.nf --pairs "data/{1,2}.fastq.gz" --version 1-2 -bg -resume > log
+```
+
+
+## Indrop versions v1, v2 and v3 are supported
 ### Version 1 and 2
 **Parameter version: "V1-2"**
 * File 1: barcode reads. Structure:
@@ -38,10 +82,6 @@ https://github.com/hms-dbmi/dropEst
 
 The parameter **library_tag** is only needed with version **V3_4**
 
-## Install
-1. install docker or singularity.
-1. git clone https://github.com/biocorecrg/indrop.git; cd indrop
-1. sh INSTALL.sh for checking Nextflow and installing bioNextflow
 
 # Parameters
 1. Parameters are specified within the **params.config** file
