@@ -31,7 +31,6 @@ mtgenes                       : ${params.mtgenes}
 version                       : ${params.version}
 library_tag                   : ${params.library_tag}
 output (output folder)        : ${params.output}
-storeIndex
 """
 
 if (params.help) exit 1
