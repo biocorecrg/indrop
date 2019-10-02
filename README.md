@@ -1,4 +1,4 @@
-# ![indrop](https://github.com/CRG-CNAG/BioCoreMiscOpen/blob/master/logo/biocore-logo_small.png) indrop
+# ![indrop](https://github.com/CRG-CNAG/BioCoreMiscOpen/blob/master/logo/biocore-logo_small.png) Indrop-Flow
 
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Nextflow version](https://img.shields.io/badge/nextflow-%E2%89%A50.31.0-brightgreen.svg)](https://www.nextflow.io/)
@@ -10,8 +10,9 @@ Indrops analysis pipeline at BioCore@CRG
 The pipeline is based on the DropEST tool:
 https://github.com/hms-dbmi/dropEst
 
-## The current supported version is v1 & v2
-
+## We support versions v1, v2 and v3
+### Version 1 and 2
+**Parameter version: "V1-2"**
 * File 1: barcode reads. Structure:
   * Cell barcode, part 1
   * Spacer
@@ -19,8 +20,27 @@ https://github.com/hms-dbmi/dropEst
   * UMI
 * File 2: gene reads
 
+### Version 3
+**Parameter version: "V3_3"**
+* File 1: cell barcode
+* File 2: 
+  * cell barcode 
+  * UMI 
+* File 3: gene read
+
+**Parameter version: "V3_4"**
+* File 1: cell barcode
+* File 2: 
+  * cell barcode 
+  * UMI 
+* File 3: gene read
+* File 4: library_tag
+
+The parameter **library_tag** is only needed with version **V3_4**
+
 ## Install
 1. install docker or singularity.
+1. git clone https://github.com/biocorecrg/indrop.git; cd indrop
 1. sh INSTALL.sh for checking Nextflow and installing bioNextflow
 
 # Parameters
