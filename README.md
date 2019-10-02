@@ -36,7 +36,7 @@ https://github.com/hms-dbmi/dropEst
 * File 3: gene read
 * File 4: library_tag
 
-The parameter library_tag is only needed with version **V3_4**
+The parameter **library_tag** is only needed with version **V3_4**
 
 ## Install
 1. install docker or singularity.
