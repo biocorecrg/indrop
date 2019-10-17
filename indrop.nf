@@ -41,6 +41,7 @@ annotationFile      = file(params.annotation)
 configFile          = file(params.config) 
 barcodeFile         = file(params.barcode_list) 
 mitocgenesFile      = file(params.mtgenes)
+db_folder		    = file("$baseDir/genome_index")
 
 outputfolder    = "${params.output}"
 outputQC        = "${outputfolder}/QC"
@@ -224,8 +225,8 @@ process getReadLength {
     
 process buildIndex {
     tag { genomeFile }
+    storeDir db_folder
     label 'index_mem_cpus'
-
 
     input:
     file genomeFile
