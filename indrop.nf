@@ -132,13 +132,12 @@ else if (params.version == "3_3") {
 	read_pairs.map{
 		[it[0], [it[1][1], it[1][2], it[1][0] ]]
 	}.set{ reads}
-	
 	fastq_files_for_size_est.map{
 		[it[0], [it[1][0]]]
 	}.set{ fastq_file_for_size_est}	
 } else {
 	read_pairs.set{reads}
-	fastq_files_for_size_est.first.map{
+	fastq_files_for_size_est.first().map{
 		[it[0], [it[1][1]]]
 	}.set{ fastq_file_for_size_est}
 }
