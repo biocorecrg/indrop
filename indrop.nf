@@ -28,6 +28,7 @@ config                        : ${params.config}
 barcode_list                  : ${params.barcode_list}
 email                         : ${params.email}
 mtgenes                       : ${params.mtgenes}
+dbdir                         = ${params.dbdir}
 version                       : ${params.version}
 library_tag                   : ${params.library_tag}
 output (output folder)        : ${params.output}
@@ -41,7 +42,7 @@ annotationFile      = file(params.annotation)
 configFile          = file(params.config) 
 barcodeFile         = file(params.barcode_list) 
 mitocgenesFile      = file(params.mtgenes)
-db_folder		    = file("$baseDir/genome_index")
+db_folder		    = file(params.dbdir)
 
 outputfolder    = "${params.output}"
 outputQC        = "${outputfolder}/QC"
