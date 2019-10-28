@@ -30,6 +30,7 @@ email                         : ${params.email}
 mtgenes                       : ${params.mtgenes}
 dbdir                         = ${params.dbdir}
 version                       : ${params.version}
+keepmulti                     : ${params.keepmulti}
 library_tag                   : ${params.library_tag}
 output (output folder)        : ${params.output}
 """
@@ -65,6 +66,9 @@ if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitoc
 
 if (params.version != "1-2" && params.version != "3_3" && params.version != "3_4") 
 	exit 1, "Please define a valid version! It can be 1-2, 3_3, 3_4.\nRespectively version 1 or 2, version 3 with 3 files and version 4 with 4 files."
+
+if (params.keepmulti != "NO" && params.keepmulti != "YES") 
+	exit 1, "Please define a valid keepmulti value! It can YES or NO"
 
 /*
  * Creates the `read_pairs` channel that emits for each read-pair a tuple containing
@@ -266,30 +270,35 @@ process mapping {
 
 }
 
-/*
- * Removing multi-mapping
- */
+if (params.keepmulti == "NO") {
+	/*
+	 * Removing multi-mapping
+	 */
+	 
+	process removeMultimapping {
+		publishDir outputMapping
+		label 'big_mem_cpus'
+		tag { pair_id }
 
-process removeMultimapping {
-    publishDir outputMapping
-    label 'big_mem_cpus'
-    tag { pair_id }
+		input:
+		set pair_id, file(aln) from STARmappedTags_for_filter    
 
-    input:
-    set pair_id, file(aln) from STARmappedTags_for_filter    
-
-    output:
-    set pair_id, file ("${pair_id}_univoc_s.bam") into STARmappedTags_for_est
-    
-    script:
-	"""
-	samtools view -H ${aln} > ${pair_id}_univoc_s.sam
-	samtools view -@ ${task.cpus} ${aln} | grep \"\\<NH:i:1\\>\" >> ${pair_id}_univoc_s.sam
-	samtools view -@ ${task.cpus} -Sb ${pair_id}_univoc_s.sam > ${pair_id}_univoc_s.bam 
-	rm ${pair_id}_univoc_s.sam
-	"""
+		output:
+		set pair_id, file ("${pair_id}_univoc_s.bam") into STARmappedTags_for_est
+	
+		script:
+		"""
+		samtools view -H ${aln} > ${pair_id}_univoc_s.sam
+		samtools view -@ ${task.cpus} ${aln} | grep \"\\<NH:i:1\\>\" >> ${pair_id}_univoc_s.sam
+		samtools view -@ ${task.cpus} -Sb ${pair_id}_univoc_s.sam > ${pair_id}_univoc_s.bam 
+		rm ${pair_id}_univoc_s.sam
+		"""
  
+	}
+} else {
+   STARmappedTags_for_est = STARmappedTags_for_filter
 }
+
 
 process dropEst {
     label 'indrop_one_cpu'
