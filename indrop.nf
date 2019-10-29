@@ -28,7 +28,7 @@ config                        : ${params.config}
 barcode_list                  : ${params.barcode_list}
 email                         : ${params.email}
 mtgenes                       : ${params.mtgenes}
-dbdir                         = ${params.dbdir}
+dbdir                         : ${params.dbdir}
 version                       : ${params.version}
 keepmulti                     : ${params.keepmulti}
 library_tag                   : ${params.library_tag}
