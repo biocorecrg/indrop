@@ -1,7 +1,9 @@
 #!/usr/bin/env Rscript
 # options(verbose=T)
 
-.libPaths(c("/home/user/R/x86_64-redhat-linux-gnu-library/3.4"))
+#.libPaths(c("/home/user/R/x86_64-redhat-linux-gnu-library/3.4"))
+
+#.libPaths(c("/root/.Rprofile"))
 
 library(knitr)
 library(optparse)
@@ -33,7 +35,7 @@ d <- readRDS(opt$args[[1]])
 report_script_prefix <- dirname(sub("--file=", "", grep("--file=", commandArgs(), value = TRUE)[1]))
 report_script <- paste0(report_script_prefix, '/scripts/report.Rmd')
 if (!file.exists(report_script)) {
-  report_script <- paste0(report_script_prefix, '/../usr/share/dropEst/report.Rmd')
+  report_script <- '/project/dropEst/scripts/report.Rmd'
   #report_script <- paste0(report_script_prefix, './report.Rmd')
   #report_script <- './report.Rmd'
 }

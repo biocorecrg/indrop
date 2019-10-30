@@ -42,7 +42,7 @@ genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
 configFile          = file(params.config) 
 barcodeFile         = file(params.barcode_list) 
-mitocgenesFile      = file(params.mtgenes)
+//mitocgenesFile      = file(params.mtgenes)
 db_folder		    = file(params.dbdir)
 
 outputfolder    = "${params.output}"
@@ -56,8 +56,7 @@ rep_folder      = "${outputfolder}/Reports"
 if( !barcodeFile.exists() ) exit 1, "Missing barcode file: ${barcodeFile}"
 if( !genomeFile.exists() ) exit 1, "Missing genome file: ${genomeFile}"
 if( !annotationFile.exists() ) exit 1, "Missing annotation file: ${annotationFile}"
-if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
-if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
+//if( !mitocgenesFile.exists() ) exit 1, "Missing mitocondrial genes file: ${mitocgenesFile}"
 
 /*
 * if (params.strand == "yes") qualiOption = "strand-specific-forward"
@@ -84,24 +83,6 @@ Channel
     .ifEmpty { error "Cannot find any reads matching: ${params.reads}" }
     .set { reads_for_fastqc}    
 
-/*
- * Transform gene list in RDS
-*/
-process MitoGeneToRDS {
-   label 'indrop_one_cpu'
-   tag { mitocgenesFile }
-   
-    input:
-    file(mitoc) from mitocgenesFile
-
-    output:
-    file("mitoc.rds") into mitocRDS
-
-    script:
-	"""
-	R --slave -e \'a<-read.table("${mitoc}"); b<-as.vector(a\$V1); saveRDS(b, "mitoc.rds")\'
-	"""
-}
 
 /*
  * Run FastQC on raw data
@@ -337,14 +318,21 @@ process dropReport {
 
     input:
     set pair_id, file(estimate), file (droptag) from estimates_rds.join(tagged_rds_for_report)
-    file(mitocRDS)
+    //file(mitocRDS)
     
     output:
     set pair_id, file ("${pair_id}_report.html")  into outreport
 
-    script:     
+    script:
+    def mitopar = ""
+    def mitocmd = ""
+    if (params.mtgenes != "") {
+        mitopar = " -m mitoc.rds" 
+        mitocmd = "R --slave -e \'a<-read.table("${params.mtgenes}"); b<-as.vector(a\$V1); saveRDS(b, "mitoc.rds")\'"
+    }
     """
-    dropReport.Rsc -t ${droptag} -o ${pair_id}_report.html -m ${mitocRDS} ${estimate} 
+    ${mitocmd}
+    dropReport.Rsc -t ${droptag} -o ${pair_id}_report.html ${mitopar} ${estimate} 
     """
 }
 
