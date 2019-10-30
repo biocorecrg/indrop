@@ -328,7 +328,7 @@ process dropReport {
     def mitocmd = ""
     if (params.mtgenes != "") {
         mitopar = " -m mitoc.rds" 
-        mitocmd = "R --slave -e \'a<-read.table("${params.mtgenes}"); b<-as.vector(a\$V1); saveRDS(b, "mitoc.rds")\'"
+        mitocmd = "gene_to_rds.r ${params.mtgenes} mitoc.rds"
     }
     """
     ${mitocmd}
@@ -374,7 +374,7 @@ workflow.onComplete {
 * send mail
 */
 workflow.onComplete {
-    def subject = 'indropSeq execution'
+    def subject = 'indrop-Flow execution'
     def recipient = "${params.email}"
     def attachment = "${outputMultiQC}/multiqc_report.html"
 
