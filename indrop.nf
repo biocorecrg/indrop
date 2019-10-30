@@ -311,7 +311,7 @@ process dropEst {
 *
 */
 process dropReport {
-    label 'indrop_one_cpu'
+    label 'dropreport'
     errorStrategy = 'ignore'
     publishDir rep_folder, mode: 'copy'
     tag { pair_id }
@@ -328,7 +328,7 @@ process dropReport {
     def mitocmd = ""
     if (params.mtgenes != "") {
         mitopar = " -m mitoc.rds" 
-        mitocmd = "R --slave -e \'a<-read.table("${params.mtgenes}"); b<-as.vector(a\$V1); saveRDS(b, "mitoc.rds")\'"
+        mitocmd = "gene_to_rds.r ${params.mtgenes} mitoc.rds"
     }
     """
     ${mitocmd}
