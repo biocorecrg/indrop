@@ -14,9 +14,9 @@ params.resume          = false
 
 log.info """
 
-╔╗ ┬┌─┐┌─┐┌─┐┬─┐┌─┐╔═╗╦═╗╔═╗  ┬┌┐┌┌┬┐┬─┐┌─┐┌─┐╔═╗╔═╗╔═╗ 
-╠╩╗││ ││  │ │├┬┘├┤ ║  ╠╦╝║ ╦  ││││ ││├┬┘│ │├─┘╚═╗║╣ ║═╬╗
-╚═╝┴└─┘└─┘└─┘┴└─└─┘╚═╝╩╚═╚═╝  ┴┘└┘─┴┘┴└─└─┘┴  ╚═╝╚═╝╚═╝╚
+╔╗ ┬┌─┐┌─┐┌─┐┬─┐┌─┐╔═╗╦═╗╔═╗  ╦┌┐┌┌┬┐┬─┐┌─┐┌─┐╔═╗╦  ╔═╗╦ ╦
+╠╩╗││ ││  │ │├┬┘├┤ ║  ╠╦╝║ ╦  ║│││ ││├┬┘│ │├─┘╠╣ ║  ║ ║║║║
+╚═╝┴└─┘└─┘└─┘┴└─└─┘╚═╝╩╚═╚═╝  ╩┘└┘─┴┘┴└─└─┘┴  ╚  ╩═╝╚═╝╚╩╝
                                                                                        
 ====================================================
 BIOCORE@CRG indropSEQ - N F  ~  version ${version}
@@ -359,6 +359,15 @@ process dropReport {
         """
         multiqc .
         """
+}
+
+
+workflow.onComplete {
+    println "Pipeline BIOCORE@indrop-Flow completed!"
+    println "Started at  $workflow.start" 
+    println "Finished at $workflow.complete"
+    println "Time elapsed: $workflow.duration"
+    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
 }
 
 /*
