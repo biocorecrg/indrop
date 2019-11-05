@@ -1,4 +1,4 @@
-# R --slave --args infile outfile < gene_to_rds.r
+#!/usr/bin/env Rscript
 
 args<-commandArgs(TRUE)
 infile	<- args[1]
