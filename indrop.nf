@@ -14,9 +14,9 @@ params.resume          = false
 
 log.info """
 
-╔╗ ┬┌─┐┌─┐┌─┐┬─┐┌─┐╔═╗╦═╗╔═╗  ┬┌┐┌┌┬┐┬─┐┌─┐┌─┐╔═╗╔═╗╔═╗ 
-╠╩╗││ ││  │ │├┬┘├┤ ║  ╠╦╝║ ╦  ││││ ││├┬┘│ │├─┘╚═╗║╣ ║═╬╗
-╚═╝┴└─┘└─┘└─┘┴└─└─┘╚═╝╩╚═╚═╝  ┴┘└┘─┴┘┴└─└─┘┴  ╚═╝╚═╝╚═╝╚
+╔╗ ┬┌─┐┌─┐┌─┐┬─┐┌─┐╔═╗╦═╗╔═╗  ╦┌┐┌┌┬┐┬─┐┌─┐┌─┐╔═╗╦  ╔═╗╦ ╦
+╠╩╗││ ││  │ │├┬┘├┤ ║  ╠╦╝║ ╦  ║│││ ││├┬┘│ │├─┘╠╣ ║  ║ ║║║║
+╚═╝┴└─┘└─┘└─┘┴└─└─┘╚═╝╩╚═╚═╝  ╩┘└┘─┴┘┴└─└─┘┴  ╚  ╩═╝╚═╝╚╩╝
                                                                                        
 ====================================================
 BIOCORE@CRG indropSEQ - N F  ~  version ${version}
@@ -342,7 +342,11 @@ process dropReport {
     def mitocmd = ""
     if (params.mtgenes != "") {
         mitopar = " -m mitoc.rds" 
+<<<<<<< HEAD
         mitocmd = "gene_to_rds.r ${mitocgenesFile} mitoc.rds"
+=======
+        mitocmd = "gene_to_rds.r ${params.mtgenes} mitoc.rds"
+>>>>>>> c7cdf61e794a90f583b99948e3f39640ecb1c5ef
     }
     """
     ${mitocmd}
@@ -375,11 +379,20 @@ process dropReport {
         """
 }
 
+
+workflow.onComplete {
+    println "Pipeline BIOCORE@indrop-Flow completed!"
+    println "Started at  $workflow.start" 
+    println "Finished at $workflow.complete"
+    println "Time elapsed: $workflow.duration"
+    println "Execution status: ${ workflow.success ? 'OK' : 'failed' }"
+}
+
 /*
 * send mail
 */
 workflow.onComplete {
-    def subject = 'indropSeq execution'
+    def subject = 'indrop-Flow execution'
     def recipient = "${params.email}"
     def attachment = "${outputMultiQC}/multiqc_report.html"
 
