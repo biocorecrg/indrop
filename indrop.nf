@@ -42,6 +42,7 @@ genomeFile          = file(params.genome)
 annotationFile      = file(params.annotation) 
 configFile          = file(params.config) 
 barcodeFile         = file(params.barcode_list) 
+if (params.mtgenes != "") mitocgenesFile  = file(params.mtgenes) 
 //mitocgenesFile      = file(params.mtgenes)
 db_folder		    = file(params.dbdir)
 
@@ -211,7 +212,8 @@ process getReadLength {
     
 process buildIndex {
     tag { genomeFile }
-    storeDir db_folder
+   // storeDir db_folder
+    
     label 'index_mem_cpus'
 
     input:
@@ -220,7 +222,7 @@ process buildIndex {
     val read_size from read_length.map {  it.trim().toInteger() } 
 
     output:
-    file "STARgenome" into STARgenomeIndex
+    file ("STARgenome") into STARgenomeIndex
     
     script:
     def aligner = new NGSaligner(reference_file:genomeFile, index:"STARgenome", annotation_file:annotationFile, read_size:read_size-1, cpus:task.cpus)
@@ -240,14 +242,26 @@ process mapping {
     set pair_id, file(reads) from tagged_files_for_alignment    
 
     output:
-    set pair_id, file("STAR_${pair_id}/${pair_id}Aligned.sortedByCoord.out.bam") into STARmappedTags_for_filter
+    set pair_id, file("STAR_${pair_id}/${pair_id}*.bam") into STARmappedTags_for_filter
     set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_qualimap
     set pair_id, file("STAR_${pair_id}") into STARmappedFolders_for_multiQC
 
 // To add --outFilterMultimapNmax 1?
     script:
-    def aligner = new NGSaligner(id:pair_id, reads:reads, index:STARgenome, cpus:task.cpus, output:"STAR_${pair_id}") 
-    aligner.doAlignment("STAR")  
+    """
+    STAR   --runThreadN ${task.cpus} \
+    --genomeDir ${STARgenome}   --readFilesIn ${reads}  --readFilesCommand zcat \
+    --outFileNamePrefix ${pair_id}  --outSAMtype BAM Unsorted --outSAMunmapped None
+        mkdir STAR_${pair_id} 
+        mv ${pair_id}Aligned* STAR_${pair_id}/. 
+        mv ${pair_id}SJ* STAR_${pair_id}/. 
+        mv ${pair_id}Log* STAR_${pair_id}/. 
+        if test -f "${pair_id}ReadsPerGene*"; 
+           then mv ${pair_id}ReadsPerGene* STAR_${pair_id}/.
+        fi       
+    """
+    //def aligner = new NGSaligner(id:pair_id, reads:reads, index:STARgenome, cpus:task.cpus,  output:"STAR_${pair_id}") 
+    //aligner.doAlignment("STAR")  
 
 }
 
@@ -311,7 +325,7 @@ process dropEst {
 *
 */
 process dropReport {
-    label 'indrop_one_cpu'
+    label 'dropreport'
     errorStrategy = 'ignore'
     publishDir rep_folder, mode: 'copy'
     tag { pair_id }
@@ -328,7 +342,11 @@ process dropReport {
     def mitocmd = ""
     if (params.mtgenes != "") {
         mitopar = " -m mitoc.rds" 
+<<<<<<< HEAD
+        mitocmd = "gene_to_rds.r ${mitocgenesFile} mitoc.rds"
+=======
         mitocmd = "gene_to_rds.r ${params.mtgenes} mitoc.rds"
+>>>>>>> c7cdf61e794a90f583b99948e3f39640ecb1c5ef
     }
     """
     ${mitocmd}
