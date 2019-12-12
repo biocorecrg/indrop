@@ -45,6 +45,7 @@ barcodeFile         = file(params.barcode_list)
 if (params.mtgenes != "") mitocgenesFile  = file(params.mtgenes) 
 //mitocgenesFile      = file(params.mtgenes)
 db_folder		    = file(params.dbdir)
+dropestScript       = file("$baseDir/docker/dropestr/dropReport.Rsc")
 
 outputfolder    = "${params.output}"
 outputQC        = "${outputfolder}/QC"
@@ -332,7 +333,7 @@ process dropReport {
 
     input:
     set pair_id, file(estimate), file (droptag) from estimates_rds.join(tagged_rds_for_report)
-    //file(mitocRDS)
+    file (dropestScript)
     
     output:
     set pair_id, file ("${pair_id}_report.html")  into outreport
@@ -346,7 +347,7 @@ process dropReport {
     }
     """
     ${mitocmd}
-    dropReport.Rsc -t ${droptag} -o ${pair_id}_report.html ${mitopar} ${estimate} 
+    Rscript --vanilla ${dropestScript} -t ${droptag} -o ${pair_id}_report.html ${mitopar} ${estimate} 
     """
 }
 
