@@ -342,11 +342,7 @@ process dropReport {
     def mitocmd = ""
     if (params.mtgenes != "") {
         mitopar = " -m mitoc.rds" 
-<<<<<<< HEAD
         mitocmd = "gene_to_rds.r ${mitocgenesFile} mitoc.rds"
-=======
-        mitocmd = "gene_to_rds.r ${params.mtgenes} mitoc.rds"
->>>>>>> c7cdf61e794a90f583b99948e3f39640ecb1c5ef
     }
     """
     ${mitocmd}
